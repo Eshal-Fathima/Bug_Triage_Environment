@@ -52,19 +52,20 @@ TASKS = [
     },
 
     {
-        "issue_id"  : "EASY-003",
-        "difficulty": "easy",
-        "task_type" : "label",
-        "title"     : "How do I reset my password?",
-        "body"      : (
-            "I cannot find the password reset option anywhere.\n"
-            "I've checked the account settings and the login page.\n"
-            "Is there a way to reset my password without contacting support?"
-        ),
-        "comments"  : [
-            "This is covered in our docs at /docs/account/password-reset.",
-        ],
-        "gold"      : {"label": "question"},
+    "issue_id"  : "EASY-003",
+    "difficulty": "easy",
+    "task_type" : "label",
+    "title"     : "How do I reset my password?",
+    "body"      : (
+        "Hi, I have a question about resetting my password.\n"
+        "I cannot find the password reset option anywhere.\n"
+        "I've checked the account settings and the login page.\n"
+        "Can someone please help me? Where do I find this option?"
+    ),
+    "comments"  : [
+        "This is covered in our docs at /docs/account/password-reset.",
+    ],
+    "gold"      : {"label": "question"},
     },
 
     # ══════════════════════════════════════════════════════════════════
