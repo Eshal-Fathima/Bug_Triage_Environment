@@ -1,18 +1,19 @@
+---
+title: Bug Triage Env
+emoji: 🐛
+colorFrom: red
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # 🐛 Bug Triage Environment
 
-An AI agent evaluation environment where a language model triages GitHub-style
-issues across three difficulty levels — labelling, severity scoring, and
-localising the broken module.
-
----
+An AI agent evaluation environment where a language model triages GitHub-style issues across three difficulty levels — labelling, severity scoring, and localising the broken module.
 
 ## Problem
 
-Software teams waste hours manually sorting incoming bug reports. An AI agent
-that can correctly classify, prioritise, and locate bugs accelerates developer
-workflows dramatically.
-
----
+Software teams waste hours manually sorting incoming bug reports. An AI agent that can correctly classify, prioritise, and locate bugs accelerates developer workflows dramatically.
 
 ## Environment
 
@@ -48,8 +49,6 @@ workflows dramatically.
 Valid labels: `bug`, `feature`, `question`, `documentation`, `duplicate`  
 Valid severities: `P0` (critical) → `P3` (cosmetic)
 
----
-
 ## Tasks
 
 ### 🟢 Easy — Label Classification (3 tasks)
@@ -64,8 +63,6 @@ Grading: 0.3 for correct label + 0.7 for correct severity (partial credit within
 Agent assigns label + severity + identifies the broken source file.  
 Grading: 0.2 (label) + 0.3 (severity) + 0.5 (module, partial credit for path overlap).
 
----
-
 ## Reward Function
 
 Rewards are **continuous and step-wise**, not just final:
@@ -76,16 +73,14 @@ Rewards are **continuous and step-wise**, not just final:
 - Invalid action → −0.05 to −0.1 penalty
 - All rewards clamped to [0, 1]
 
----
-
 ## Setup
 
 ```bash
-git clone <repo>
-cd bug_triage_env
+git clone https://github.com/Eshal-Fathima/bug_triage_environment
+cd bug_triage_environment
 
 pip install -r requirements.txt
-export OPENAI_API_KEY="sk-..."
+export GROQ_API_KEY="gsk_..."   # Windows: $env:GROQ_API_KEY="gsk_..."
 
 # Run all 9 tasks
 python inference.py
@@ -94,10 +89,8 @@ python inference.py
 python inference.py --task 4
 
 # Use a different model
-python inference.py --model gpt-4o
+python inference.py --model llama-3.3-70b-versatile
 ```
-
----
 
 ## Output Format
 
@@ -122,25 +115,21 @@ python inference.py --model gpt-4o
 ------------------------------------------------------------
 ```
 
----
-
 ## Docker
 
 ```bash
 docker build -t bug-triage .
-docker run -e OPENAI_API_KEY=$OPENAI_API_KEY bug-triage
+docker run -e GROQ_API_KEY=$GROQ_API_KEY bug-triage
 
 # Single task
-docker run -e OPENAI_API_KEY=$OPENAI_API_KEY bug-triage \
-  python inference.py --task 6 --model gpt-4o
+docker run -e GROQ_API_KEY=$GROQ_API_KEY bug-triage \
+  python inference.py --task 6 --model llama-3.3-70b-versatile
 ```
-
----
 
 ## Project Structure
 
 ```
-bug_triage_env/
+bug_triage_environment/
 ├── environment.py   # BugTriageEnvironment class (reset/step/state)
 ├── tasks.py         # 9 issues with gold labels (easy/medium/hard)
 ├── inference.py     # Agent loop + strict [START]/[STEP]/[END] logging
