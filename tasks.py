@@ -1,17 +1,12 @@
 """
 Task definitions for the Bug Triage Environment.
-
-3 difficulty tiers × 3 issues each = 9 tasks total.
-
-EASY   (task_type="label")    → classify the issue type
-MEDIUM (task_type="severity") → label + assign P0–P3 severity
-HARD   (task_type="locate")   → label + severity + identify the broken module
+15 tasks total — 5 per difficulty level.
 """
 
 TASKS = [
 
     # ══════════════════════════════════════════════════════════════════
-    # EASY — Label classification
+    # EASY — Label classification (5 tasks)
     # ══════════════════════════════════════════════════════════════════
 
     {
@@ -52,24 +47,58 @@ TASKS = [
     },
 
     {
-    "issue_id"  : "EASY-003",
-    "difficulty": "easy",
-    "task_type" : "label",
-    "title"     : "How do I reset my password?",
-    "body"      : (
-        "Hi, I have a question about resetting my password.\n"
-        "I cannot find the password reset option anywhere.\n"
-        "I've checked the account settings and the login page.\n"
-        "Can someone please help me? Where do I find this option?"
-    ),
-    "comments"  : [
-        "This is covered in our docs at /docs/account/password-reset.",
-    ],
-    "gold" : {"label": "documentation"},
+        "issue_id"  : "EASY-003",
+        "difficulty": "easy",
+        "task_type" : "label",
+        "title"     : "How do I reset my password?",
+        "body"      : (
+            "Hi, I have a question about resetting my password.\n"
+            "I cannot find the password reset option anywhere.\n"
+            "I've checked the account settings and the login page.\n"
+            "Can someone please help me? Where do I find this option?"
+        ),
+        "comments"  : [
+            "This is covered in our docs at /docs/account/password-reset.",
+        ],
+        "gold"      : {"label": "documentation"},
+    },
+
+    {
+        "issue_id"  : "EASY-004",
+        "difficulty": "easy",
+        "task_type" : "label",
+        "title"     : "Login button unresponsive on Safari 17",
+        "body"      : (
+            "On Safari 17.2, clicking the login button does nothing.\n"
+            "No error in console. Works fine on Chrome and Firefox.\n"
+            "Tested on macOS Ventura and Sonoma — same result.\n"
+            "Users on Safari cannot log in at all."
+        ),
+        "comments"  : [
+            "Reproduced by 3 team members on Safari.",
+            "Likely a JS compatibility issue.",
+        ],
+        "gold"      : {"label": "bug"},
+    },
+
+    {
+        "issue_id"  : "EASY-005",
+        "difficulty": "easy",
+        "task_type" : "label",
+        "title"     : "This issue was already reported in #1042",
+        "body"      : (
+            "I'm seeing the same crash as reported in issue #1042.\n"
+            "The file upload crash happens for me too.\n"
+            "Marking this as a repeat of the existing report."
+        ),
+        "comments"  : [
+            "Confirmed — exact same stack trace as #1042.",
+        ],
+        "gold"      : {"label": "duplicate"},
     },
 
     # ══════════════════════════════════════════════════════════════════
-    # MEDIUM — Label + Severity
+    # MEDIUM — Label + Severity (5 tasks)
     # ══════════════════════════════════════════════════════════════════
 
     {
@@ -127,8 +156,45 @@ TASKS = [
         "gold"      : {"label": "bug", "severity": "P1"},
     },
 
+    {
+        "issue_id"  : "MED-004",
+        "difficulty": "medium",
+        "task_type" : "severity",
+        "title"     : "Admin dashboard shows incorrect user count",
+        "body"      : (
+            "The user count on the admin dashboard shows 1,240 users\n"
+            "but the database query returns 1,312 users.\n"
+            "The discrepancy appears to be due to a cached value\n"
+            "that is only refreshed every 24 hours.\n"
+            "No users are affected directly — admins only."
+        ),
+        "comments"  : [
+            "Noticed during quarterly review.",
+            "Not urgent but misleading for reporting.",
+        ],
+        "gold"      : {"label": "bug", "severity": "P2"},
+    },
+
+    {
+        "issue_id"  : "MED-005",
+        "difficulty": "medium",
+        "task_type" : "severity",
+        "title"     : "Database credentials exposed in error logs",
+        "body"      : (
+            "When a DB connection fails, the full connection string\n"
+            "including username and password is printed to the logs.\n"
+            "These logs are accessible to all engineers with log access.\n"
+            "This is a security vulnerability that must be fixed immediately."
+        ),
+        "comments"  : [
+            "Discovered during internal security audit.",
+            "Logs are currently accessible to 40+ engineers.",
+        ],
+        "gold"      : {"label": "bug", "severity": "P0"},
+    },
+
     # ══════════════════════════════════════════════════════════════════
-    # HARD — Label + Severity + Module
+    # HARD — Label + Severity + Module (5 tasks)
     # ══════════════════════════════════════════════════════════════════
 
     {
@@ -246,6 +312,88 @@ TASKS = [
             "label"   : "bug",
             "severity": "P2",
             "modules" : ["search/pagination.py", "search/engine.py"],
+        },
+    },
+
+    {
+        "issue_id"  : "HARD-004",
+        "difficulty": "hard",
+        "task_type" : "locate",
+        "title"     : "Password reset emails are sent to wrong address after email change",
+        "body"      : (
+            "When a user changes their email and then requests a password reset,\n"
+            "the reset link is sent to the OLD email address, not the new one.\n"
+            "This locks users out of their accounts permanently.\n"
+            "Reported by 5 users in the last week."
+        ),
+        "comments"  : [
+            "Users who changed email recently are most affected.",
+            "The new email is saved correctly in the DB.",
+            "Issue seems to be in how the reset flow fetches the email.",
+        ],
+        "context"   : {
+            "repo_structure": [
+                "auth/password_reset.py",
+                "auth/email_change.py",
+                "auth/login.py",
+                "users/profile.py",
+                "users/settings.py",
+                "notifications/email_sender.py",
+                "notifications/templates.py",
+                "db/models.py",
+                "db/user_repository.py",
+            ],
+            "description": (
+                "auth/password_reset.py handles the reset flow. "
+                "notifications/email_sender.py sends all emails. "
+                "db/user_repository.py fetches user data from the database."
+            ),
+        },
+        "gold"      : {
+            "label"   : "bug",
+            "severity": "P1",
+            "modules" : ["auth/password_reset.py", "db/user_repository.py"],
+        },
+    },
+
+    {
+        "issue_id"  : "HARD-005",
+        "difficulty": "hard",
+        "task_type" : "locate",
+        "title"     : "API rate limiter blocks legitimate users after burst traffic",
+        "body"      : (
+            "Our rate limiter uses a fixed window counter.\n"
+            "Users who make 100 requests at 11:59 PM and 100 at 12:00 AM\n"
+            "are blocked even though they are within the hourly limit.\n"
+            "This is the classic fixed-window boundary bug.\n"
+            "Legitimate power users are being blocked daily."
+        ),
+        "comments"  : [
+            "Sliding window algorithm would fix this.",
+            "Affects ~200 API customers per day.",
+            "Support tickets have tripled this week.",
+        ],
+        "context"   : {
+            "repo_structure": [
+                "api/rate_limiter.py",
+                "api/middleware.py",
+                "api/routes.py",
+                "cache/redis_client.py",
+                "cache/window_counter.py",
+                "auth/token_validator.py",
+                "db/models.py",
+                "config/settings.py",
+            ],
+            "description": (
+                "api/rate_limiter.py implements the rate limiting logic. "
+                "cache/window_counter.py manages the counter storage in Redis. "
+                "api/middleware.py applies rate limiting on every request."
+            ),
+        },
+        "gold"      : {
+            "label"   : "bug",
+            "severity": "P1",
+            "modules" : ["api/rate_limiter.py", "cache/window_counter.py"],
         },
     },
 ]
