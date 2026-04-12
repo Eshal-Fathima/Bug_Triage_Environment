@@ -1,31 +1,36 @@
 """
 inference.py
 ============
-Runs the AI agent through all tasks in the Bug Triage Environment.
+OpenEnv-compliant inference script for Bug Triage Environment.
+
+Required environment variables:
+    API_BASE_URL   The API endpoint for the LLM
+    MODEL_NAME     The model identifier to use
+    HF_TOKEN       Your Hugging Face / API key
 
 Usage:
-    python inference.py                          # run all tasks
-    python inference.py --task 0                 # run single task by index
-    python inference.py --model llama-3.1-8b-instant  # specify model
-
-Output strictly follows the required format:
-    [START]  ... task header
-    [STEP]   ... each agent action + env response
-    [END]    ... final score summary
+    python inference.py
+    python inference.py --task 0
 """
 
 import os
 import json
 import argparse
-from groq import Groq
+from openai import OpenAI
+from environment import BugTriageEnvironment, BugTriageAction
 
-from environment import BugTriageEnvironment
+# ── Config from environment variables ─────────────────────────────────
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
+API_KEY      = os.getenv("HF_TOKEN")     or os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
+BENCHMARK    = "bug-triage"
 
-# ── Groq client (reads GROQ_API_KEY from environment) ─────────────────
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+client = OpenAI(
+    api_key=API_KEY,
+    base_url=API_BASE_URL,
+)
 
 # ── System prompt ──────────────────────────────────────────────────────
-
 SYSTEM_PROMPT = """You are an expert software engineering triage agent.
 You will be shown a GitHub-style issue and must respond with a JSON object.
 
@@ -56,121 +61,124 @@ RULES:
 - Never put descriptions inside the severity field — only P0, P1, P2, or P3.
 """
 
-def build_user_prompt(obs: dict) -> str:
+def build_user_prompt(obs) -> str:
     lines = [
-        f"Issue ID: {obs['issue_id']}",
-        f"Title: {obs['title']}",
-        f"",
-        f"Description:",
-        obs["body"],
+        f"Issue ID: {obs.issue_id}",
+        f"Title: {obs.title}",
+        "",
+        "Description:",
+        obs.body,
     ]
-
-    if obs.get("comments"):
+    if obs.comments:
         lines.append("\nComments:")
-        for c in obs["comments"]:
+        for c in obs.comments:
             lines.append(f"  - {c}")
-
-    if obs.get("context"):
-        ctx = obs["context"]
-        if ctx.get("repo_structure"):
+    if obs.context:
+        if obs.context.get("repo_structure"):
             lines.append("\nRepo file structure (pick module from this list only):")
-            for f in ctx["repo_structure"]:
+            for f in obs.context["repo_structure"]:
                 lines.append(f"  {f}")
-        if ctx.get("description"):
-            lines.append(f"\nArchitecture note: {ctx['description']}")
-
-    lines.append(f"\nTask type: {obs['task_type']}")
+        if obs.context.get("description"):
+            lines.append(f"\nArchitecture note: {obs.context['description']}")
+    lines.append(f"\nTask type: {obs.task_type}")
     lines.append("Respond with JSON only.")
     return "\n".join(lines)
 
 
-def query_agent(obs: dict, model: str) -> dict:
-    user_prompt = build_user_prompt(obs)
-
+def query_agent(obs) -> BugTriageAction:
     response = client.chat.completions.create(
-        model=model,
+        model=MODEL_NAME,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_prompt},
+            {"role": "user",   "content": build_user_prompt(obs)},
         ],
         temperature=0.0,
         max_tokens=256,
     )
-
     raw = response.choices[0].message.content.strip()
-
-    # Strip accidental markdown fences
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
         raw = raw.strip()
-
     try:
-        return json.loads(raw)
+        data = json.loads(raw)
     except json.JSONDecodeError:
-        return {"raw_response": raw, "parse_error": True}
+        data = {}
+    return BugTriageAction(
+        label    = data.get("label"),
+        severity = data.get("severity"),
+        module   = data.get("module"),
+    )
 
 
-def run_task(env: BugTriageEnvironment, task_index: int, model: str) -> dict:
+def run_task(env: BugTriageEnvironment, task_index: int) -> dict:
     obs        = env.reset(task_index)
     tasks_meta = env.list_tasks()[task_index]
+    task_name  = obs.issue_id
+    rewards    = []
+    error      = "null"
+    success    = False
+    step_count = 0
 
-    print(f"\n[START]")
-    print(f"  task_index : {task_index}")
-    print(f"  issue_id   : {obs['issue_id']}")
-    print(f"  difficulty : {tasks_meta['difficulty'].upper()}")
-    print(f"  task_type  : {obs['task_type'].upper()}")
-    print(f"  title      : {obs['title']}")
+    # [START] line — strict format
+    print(f"[START] task={task_name} env={BENCHMARK} model={MODEL_NAME}")
 
-    action = query_agent(obs, model)
+    try:
+        action     = query_agent(obs)
+        action_str = json.dumps({k: v for k, v in action.model_dump().items() if v is not None})
 
-    new_obs, reward, done, info = env.step(action)
+        new_obs, reward, done, info = env.step(action)
 
-    print(f"\n[STEP]")
-    print(f"  step       : {new_obs['step']}")
-    print(f"  action     : {json.dumps(action)}")
-    print(f"  reward     : {reward:.4f}")
-    print(f"  feedback   : {new_obs['feedback']}")
-    print(f"  done       : {done}")
+        step_count = new_obs.step
+        rewards.append(reward.value)
+        success = reward.value >= 0.5
 
-    print(f"\n[END]")
-    print(f"  final_score : {new_obs['score']:.4f} / 1.0")
-    print(f"  task_type   : {tasks_meta['difficulty'].upper()} ({obs['task_type']})")
-    print("-" * 60)
+        # [STEP] line — strict format
+        print(f"[STEP] step={step_count} action={action_str} reward={reward.value:.2f} done={str(done).lower()} error={error}")
+
+    except Exception as e:
+        error   = str(e).replace("\n", " ")
+        done    = True
+        success = False
+        rewards.append(0.0)
+        step_count = step_count or 1
+        print(f"[STEP] step={step_count} action=null reward=0.00 done=true error={error}")
+
+    score        = rewards[-1] if rewards else 0.0
+    rewards_str  = ",".join(f"{r:.2f}" for r in rewards)
+
+    # [END] line — strict format
+    print(f"[END] success={str(success).lower()} steps={step_count} score={score:.2f} rewards={rewards_str}")
 
     return {
         "task_index": task_index,
-        "issue_id"  : obs["issue_id"],
+        "issue_id"  : task_name,
         "difficulty": tasks_meta["difficulty"],
-        "task_type" : obs["task_type"],
-        "action"    : action,
-        "reward"    : reward,
-        "feedback"  : new_obs["feedback"],
-        "score"     : new_obs["score"],
+        "task_type" : obs.task_type,
+        "score"     : score,
+        "success"   : success,
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description="Bug Triage Environment — Inference Script")
-    parser.add_argument("--task",  type=int, default=None,                   help="Run a single task by index (0-8)")
-    parser.add_argument("--model", type=str, default="llama-3.1-8b-instant", help="Groq model to use")
+    parser.add_argument("--task", type=int, default=None, help="Run a single task by index (0-8)")
     args = parser.parse_args()
 
     env     = BugTriageEnvironment()
     results = []
 
     if args.task is not None:
-        results.append(run_task(env, args.task, args.model))
+        results.append(run_task(env, args.task))
     else:
         for i in range(env.num_tasks()):
-            results.append(run_task(env, i, args.model))
+            results.append(run_task(env, i))
 
     if len(results) > 1:
         by_diff = {}
         for r in results:
             by_diff.setdefault(r["difficulty"], []).append(r["score"])
-
         print("\n" + "=" * 60)
         print("FINAL SUMMARY")
         print("=" * 60)

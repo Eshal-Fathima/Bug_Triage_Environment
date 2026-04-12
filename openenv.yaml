@@ -1,0 +1,90 @@
+name: bug-triage-env
+version: "1.0.0"
+description: >
+  A simulation environment where an AI agent triages GitHub-style bug reports.
+  The agent must label issues, assign severity, and locate the broken module
+  across three difficulty levels.
+
+author: eshal14
+tags:
+  - openenv
+  - bug-triage
+  - nlp
+  - software-engineering
+  - agent-evaluation
+
+observation_space:
+  type: object
+  properties:
+    issue_id:
+      type: string
+    title:
+      type: string
+    body:
+      type: string
+    comments:
+      type: array
+      items:
+        type: string
+    task_type:
+      type: string
+      enum: [label, severity, locate]
+    context:
+      type: object
+    step:
+      type: integer
+    score:
+      type: number
+    done:
+      type: boolean
+    feedback:
+      type: string
+
+action_space:
+  type: object
+  properties:
+    label:
+      type: string
+      enum: [bug, feature, question, documentation, duplicate]
+    severity:
+      type: string
+      enum: [P0, P1, P2, P3]
+    module:
+      type: string
+
+tasks:
+  - id: label-classification
+    difficulty: easy
+    description: Classify the issue type from title and body
+    reward_range: [0.0, 1.0]
+    count: 3
+
+  - id: severity-assignment
+    difficulty: medium
+    description: Assign label and P0-P3 severity based on business impact
+    reward_range: [0.0, 1.0]
+    count: 3
+
+  - id: module-location
+    difficulty: hard
+    description: Identify label, severity, and the broken source file
+    reward_range: [0.0, 1.0]
+    count: 3
+
+reward:
+  type: continuous
+  range: [0.0, 1.0]
+  description: >
+    Partial credit at each component. Label correct = +0.2-0.3,
+    severity within 1 level = partial credit, exact module = +0.5.
+    Penalties for invalid actions.
+
+inference:
+  script: inference.py
+  api_base_url_env: API_BASE_URL
+  model_name_env: MODEL_NAME
+  api_key_env: HF_TOKEN
+
+docker:
+  build: docker build -t bug-triage-env .
+  run: docker run -e HF_TOKEN=$HF_TOKEN -e API_BASE_URL=$API_BASE_URL -e MODEL_NAME=$MODEL_NAME bug-triage-env
