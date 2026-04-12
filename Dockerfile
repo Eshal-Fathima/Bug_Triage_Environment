@@ -7,5 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run inference, save output, then keep container alive
-CMD python inference.py > /app/output.log 2>&1; cat /app/output.log; tail -f /dev/null
+EXPOSE 7860
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
