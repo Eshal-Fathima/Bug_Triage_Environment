@@ -7,8 +7,8 @@ inference.py still runs as a background task on startup.
 """
 
 import os
-import json
 import threading
+import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
@@ -86,3 +86,13 @@ def run_inference():
 def startup_event():
     thread = threading.Thread(target=run_inference, daemon=True)
     thread.start()
+
+
+# ── Main entry point ───────────────────────────────────────────────────
+
+def main():
+    uvicorn.run("app:app", host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+    main()
