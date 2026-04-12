@@ -65,7 +65,7 @@ TASKS = [
     "comments"  : [
         "This is covered in our docs at /docs/account/password-reset.",
     ],
-    "gold"      : {"label": "question"},
+    "gold" : {"label": "documentation"},
     },
 
     # ══════════════════════════════════════════════════════════════════
