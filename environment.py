@@ -1,115 +1,221 @@
-import json
+"""
+Bug Triage Environment
+======================
+A simulation environment where an AI agent triages GitHub-style issues.
+The agent must label, prioritize, and locate bugs across 3 difficulty levels.
+"""
+
+import copy
 from tasks import TASKS
 
+
 class BugTriageEnvironment:
+    """
+    Simulates a GitHub issue tracker where an AI triages incoming bugs.
+
+    Observation space:
+        - issue_id     : str
+        - title        : str
+        - body         : str
+        - comments     : list[str]
+        - task_type    : "label" | "severity" | "locate"
+        - context      : dict  (repo schema info for 'locate' tasks)
+
+    Action space:
+        - label        : str  ("bug" | "feature" | "question" | "documentation" | "duplicate")
+        - severity     : str  ("P0" | "P1" | "P2" | "P3")
+        - module       : str  (file/module path, for hard tasks)
+    """
+
+    VALID_LABELS     = {"bug", "feature", "question", "documentation", "duplicate"}
+    VALID_SEVERITIES = {"P0", "P1", "P2", "P3"}
+
     def __init__(self):
-        self.tasks = TASKS
-        self.current_task_index = None
-        self.current_task = None
-        self.done = False
+        self._tasks         = copy.deepcopy(TASKS)
+        self._current_task  = None
+        self._current_index = 0
+        self._state         = {}
+        self._done          = False
+        self._steps         = 0
 
-    def reset(self, task_index=0):
-        if task_index < 0 or task_index >= len(self.tasks):
-            raise IndexError("Task index out of range")
-        
-        self.current_task_index = task_index
-        self.current_task = self.tasks[task_index]
-        self.done = False
-        
-        observation = {
-            "issue_id": self.current_task["issue_id"],
-            "title": self.current_task["title"],
-            "body": self.current_task["body"],
-            "comments": self.current_task["comments"],
-            "task_type": self.current_task["task_type"],
-            "context": self.current_task.get("context", {})
+    # ------------------------------------------------------------------
+    # Core API
+    # ------------------------------------------------------------------
+
+    def reset(self, task_index: int = 0) -> dict:
+        """Start a new task. Returns the initial observation."""
+        self._current_index = task_index
+        self._current_task  = copy.deepcopy(self._tasks[task_index])
+        self._done          = False
+        self._steps         = 0
+
+        self._state = {
+            "issue_id" : self._current_task["issue_id"],
+            "title"    : self._current_task["title"],
+            "body"     : self._current_task["body"],
+            "comments" : self._current_task.get("comments", []),
+            "task_type": self._current_task["task_type"],
+            "context"  : self._current_task.get("context", {}),
+            "step"     : 0,
+            "score"    : 0.0,
+            "done"     : False,
+            "feedback" : "Task started. Analyse the issue and take an action.",
         }
-        return observation
+        return copy.deepcopy(self._state)
 
-    def step(self, action):
-        if self.done:
-            raise RuntimeError("Environment already done. Call reset().")
+    def step(self, action: dict):
+        """
+        Execute one action.
 
-        if isinstance(action, str):
-            try:
-                action = json.loads(action)
-            except json.JSONDecodeError:
-                return None, -0.1, True, {"error": "Invalid JSON action"}
+        Returns:
+            (observation, reward, done, info)
+        """
+        if self._done:
+            raise RuntimeError("Episode is done. Call reset() first.")
 
-        gold = self.current_task["gold"]
-        task_type = self.current_task["task_type"]
-        
-        reward = 0.0
-        feedback = []
+        # Sanitize action — coerce all values to strings defensively
+        action = self._sanitize_action(action)
 
-        # 🟢 Easy — Label Classification
+        self._steps += 1
+        reward, feedback, done = self._evaluate(action)
+
+        self._state["step"]     = self._steps
+        self._state["score"]   += reward
+        self._state["done"]     = done
+        self._state["feedback"] = feedback
+        self._done              = done
+
+        info = {
+            "task_type"       : self._current_task["task_type"],
+            "action_taken"    : action,
+            "step_reward"     : reward,
+            "cumulative_score": self._state["score"],
+        }
+
+        return copy.deepcopy(self._state), reward, done, info
+
+    def state(self) -> dict:
+        """Return current state snapshot."""
+        return copy.deepcopy(self._state)
+
+    # ------------------------------------------------------------------
+    # Sanitizer — handles malformed LLM output gracefully
+    # ------------------------------------------------------------------
+
+    def _sanitize_action(self, action: dict) -> dict:
+        """Coerce all action values to strings. Handles nested dicts from confused LLMs."""
+        clean = {}
+        for k, v in action.items():
+            if isinstance(v, dict):
+                # LLM sometimes returns {"severity": {"value": "P0"}} — flatten it
+                inner = list(v.values())
+                clean[k] = str(inner[0]) if inner else ""
+            else:
+                clean[k] = str(v) if v is not None else ""
+        return clean
+
+    # ------------------------------------------------------------------
+    # Graders
+    # ------------------------------------------------------------------
+
+    def _evaluate(self, action: dict):
+        task      = self._current_task
+        task_type = task["task_type"]
+        gold      = task["gold"]
+
+        # ── EASY: Label classification ───────────────────────────────
         if task_type == "label":
-            if action.get("label") == gold["label"]:
-                reward = 1.0
-                feedback.append(f"Correct! Label '{gold['label']}' matches ground truth.")
-            else:
-                reward = 0.0
-                feedback.append(f"Incorrect label. Expected '{gold['label']}', got '{action.get('label')}'.")
+            predicted = action.get("label", "").lower().strip()
+            if predicted not in self.VALID_LABELS:
+                return -0.1, f"Invalid label '{predicted}'. Valid: {self.VALID_LABELS}", True
+            if predicted == gold["label"]:
+                return 1.0, f"Correct! Label '{predicted}' matches ground truth.", True
+            return 0.0, f"Wrong. You said '{predicted}', expected '{gold['label']}'.", True
 
-        # 🟡 Medium — Severity Assignment
-        elif task_type == "severity":
-            # Label component (0.3)
-            if action.get("label") == gold["label"]:
+        # ── MEDIUM: Severity assignment ──────────────────────────────
+        if task_type == "severity":
+            predicted_label = action.get("label", "").lower().strip()
+            predicted_sev   = action.get("severity", "").upper().strip()
+            reward, msgs    = 0.0, []
+
+            if predicted_label not in self.VALID_LABELS:
+                reward -= 0.05
+                msgs.append(f"Invalid label '{predicted_label}'.")
+            elif predicted_label == gold["label"]:
                 reward += 0.3
-                feedback.append(f"Correct label (+0.3).")
-                
-                # Severity component (0.7)
-                pred_sev = action.get("severity")
-                gold_sev = gold["severity"]
-                if pred_sev == gold_sev:
-                    reward += 0.7
-                    feedback.append(f"Correct severity (+0.7).")
+                msgs.append("Label correct (+0.3).")
+            else:
+                msgs.append(f"Wrong label (got '{predicted_label}', expected '{gold['label']}').")
+
+            sev_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+            if predicted_sev not in self.VALID_SEVERITIES:
+                reward -= 0.1
+                msgs.append(f"Invalid severity '{predicted_sev}'.")
+            else:
+                diff = abs(sev_order[predicted_sev] - sev_order[gold["severity"]])
+                if diff == 0:
+                    reward += 0.7; msgs.append("Severity correct (+0.7).")
+                elif diff == 1:
+                    reward += 0.4; msgs.append(f"Severity off by 1 (+0.4). Expected '{gold['severity']}'.")
+                elif diff == 2:
+                    reward += 0.1; msgs.append(f"Severity off by 2 (+0.1). Expected '{gold['severity']}'.")
                 else:
-                    # Partial credit for off-by-one severity (P0, P1, P2, P3)
-                    sev_levels = ["P0", "P1", "P2", "P3"]
-                    try:
-                        idx_pred = sev_levels.index(pred_sev)
-                        idx_gold = sev_levels.index(gold_sev)
-                        if abs(idx_pred - idx_gold) == 1:
-                            reward += 0.4
-                            feedback.append(f"Close severity! Off by one level (+0.4).")
-                        else:
-                            feedback.append(f"Incorrect severity. Expected '{gold_sev}'.")
-                    except ValueError:
-                        feedback.append(f"Invalid severity level '{pred_sev}'.")
+                    msgs.append(f"Severity very wrong. Expected '{gold['severity']}'.")
+
+            return max(0.0, min(1.0, reward)), " ".join(msgs), True
+
+        # ── HARD: Module location ─────────────────────────────────────
+        if task_type == "locate":
+            predicted_label  = action.get("label", "").lower().strip()
+            predicted_sev    = action.get("severity", "").upper().strip()
+            predicted_module = action.get("module", "").lower().strip()
+            reward, msgs     = 0.0, []
+
+            # Label (20%)
+            if predicted_label == gold["label"]:
+                reward += 0.2; msgs.append("Label correct (+0.2).")
             else:
-                feedback.append(f"Incorrect label. Expected '{gold['label']}'.")
+                msgs.append(f"Wrong label (got '{predicted_label}', expected '{gold['label']}').")
 
-        # 🔴 Hard — Module Location
-        elif task_type == "locate":
-            # Label (0.2)
-            if action.get("label") == gold["label"]:
-                reward += 0.2
-                feedback.append(f"Correct label (+0.2).")
-            
-            # Severity (0.3)
-            if action.get("severity") == gold["severity"]:
-                reward += 0.3
-                feedback.append(f"Correct severity (+0.3).")
-            
-            # Module (0.5)
-            pred_mod = action.get("module", "")
-            gold_mod = gold["module"]
-            if pred_mod == gold_mod:
-                reward += 0.5
-                feedback.append(f"Correct module (+0.5).")
-            elif pred_mod and (pred_mod in gold_mod or gold_mod in pred_mod):
-                reward += 0.25
-                feedback.append(f"Partial module match (+0.25).")
+            # Severity (30%)
+            sev_order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+            if predicted_sev in self.VALID_SEVERITIES:
+                diff = abs(sev_order.get(predicted_sev, 99) - sev_order[gold["severity"]])
+                if diff == 0:
+                    reward += 0.3; msgs.append("Severity correct (+0.3).")
+                elif diff == 1:
+                    reward += 0.15; msgs.append(f"Severity off by 1 (+0.15). Expected '{gold['severity']}'.")
             else:
-                feedback.append(f"Incorrect module. Expected '{gold_mod}'.")
+                msgs.append(f"Invalid severity '{predicted_sev}'.")
 
-        self.done = True
-        return None, round(reward, 4), self.done, {"feedback": " | ".join(feedback)}
+            # Module (50%)
+            gold_modules = [m.lower() for m in gold.get("modules", [gold.get("module", "")])]
+            if predicted_module in gold_modules:
+                reward += 0.5; msgs.append("Module exactly correct (+0.5).")
+            elif any(predicted_module in gm or gm in predicted_module for gm in gold_modules):
+                reward += 0.25; msgs.append(f"Module partially correct (+0.25). Full path: {gold_modules[0]}.")
+            else:
+                msgs.append(f"Wrong module. Expected one of: {gold_modules}.")
 
-    def state(self):
-        return {
-            "task_index": self.current_task_index,
-            "done": self.done,
-            "task_id": self.current_task["issue_id"] if self.current_task else None
-        }
+            return max(0.0, min(1.0, reward)), " ".join(msgs), True
+
+        return 0.0, "Unknown task type.", True
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def list_tasks(self):
+        return [
+            {
+                "index"     : i,
+                "issue_id"  : t["issue_id"],
+                "title"     : t["title"],
+                "task_type" : t["task_type"],
+                "difficulty": t["difficulty"],
+            }
+            for i, t in enumerate(self._tasks)
+        ]
+
+    def num_tasks(self):
+        return len(self._tasks)

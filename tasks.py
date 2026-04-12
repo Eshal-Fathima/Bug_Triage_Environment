@@ -1,86 +1,250 @@
+"""
+Task definitions for the Bug Triage Environment.
+
+3 difficulty tiers × 3 issues each = 9 tasks total.
+
+EASY   (task_type="label")    → classify the issue type
+MEDIUM (task_type="severity") → label + assign P0–P3 severity
+HARD   (task_type="locate")   → label + severity + identify the broken module
+"""
+
 TASKS = [
+
+    # ══════════════════════════════════════════════════════════════════
+    # EASY — Label classification
+    # ══════════════════════════════════════════════════════════════════
+
     {
-        "issue_id": "EASY-001",
-        "title": "Application crashes when uploading a file larger than 10MB",
-        "body": "Steps to reproduce: 1. Go to upload page. 2. Select a 15MB file. 3. App freezes and crashes.",
-        "comments": ["Maybe we should add a size limit check?", "I noticed this on the dev branch too."],
-        "task_type": "label",
-        "gold": {"label": "bug"},
-        "difficulty": "EASY"
+        "issue_id"  : "EASY-001",
+        "difficulty": "easy",
+        "task_type" : "label",
+        "title"     : "App crashes when uploading a file larger than 10 MB",
+        "body"      : (
+            "Steps to reproduce:\n"
+            "1. Log in to the app.\n"
+            "2. Navigate to Settings > Upload.\n"
+            "3. Select any file > 10 MB.\n"
+            "Result: The app throws an unhandled exception and crashes.\n"
+            "Expected: A user-friendly error message should appear."
+        ),
+        "comments"  : [
+            "Confirmed on v2.3.1 and v2.4.0.",
+            "Happens on both Chrome and Firefox.",
+        ],
+        "gold"      : {"label": "bug"},
     },
+
     {
-        "issue_id": "EASY-002",
-        "title": "Request to add Dark Mode support",
-        "body": "The current light theme is too bright for late-night coding. Dark mode would be highly appreciated.",
-        "comments": ["+1", "We can use CSS variables for this."],
-        "task_type": "label",
-        "gold": {"label": "feature"},
-        "difficulty": "EASY"
+        "issue_id"  : "EASY-002",
+        "difficulty": "easy",
+        "task_type" : "label",
+        "title"     : "Add dark mode support to the dashboard",
+        "body"      : (
+            "Many users have requested a dark mode option.\n"
+            "Currently the dashboard only supports light theme.\n"
+            "Please add a toggle in user preferences to switch themes."
+        ),
+        "comments"  : [
+            "+1 from design team, mocks already exist.",
+            "This would also improve accessibility.",
+        ],
+        "gold"      : {"label": "feature"},
     },
+
     {
-        "issue_id": "EASY-003",
-        "title": "How do I regenerate my API key?",
-        "body": "I lost my API key and need to regenerate it. I can't find the button in settings.",
-        "comments": ["It's under Settings > Security."],
-        "task_type": "label",
-        "gold": {"label": "question"},
-        "difficulty": "EASY"
+        "issue_id"  : "EASY-003",
+        "difficulty": "easy",
+        "task_type" : "label",
+        "title"     : "How do I reset my password?",
+        "body"      : (
+            "I cannot find the password reset option anywhere.\n"
+            "I've checked the account settings and the login page.\n"
+            "Is there a way to reset my password without contacting support?"
+        ),
+        "comments"  : [
+            "This is covered in our docs at /docs/account/password-reset.",
+        ],
+        "gold"      : {"label": "question"},
     },
+
+    # ══════════════════════════════════════════════════════════════════
+    # MEDIUM — Label + Severity
+    # ══════════════════════════════════════════════════════════════════
+
     {
-        "issue_id": "MED-001",
-        "title": "Payment gateway timeout on checkout",
-        "body": "Users are reporting timeouts during checkout. This is preventing sales.",
-        "comments": ["I see 504 errors in the logs.", "Critical: affecting revenue."],
-        "task_type": "severity",
-        "gold": {"label": "bug", "severity": "P0"},
-        "difficulty": "MEDIUM"
+        "issue_id"  : "MED-001",
+        "difficulty": "medium",
+        "task_type" : "severity",
+        "title"     : "Payment processing fails for all users — production down",
+        "body"      : (
+            "As of 14:32 UTC, no user can complete a checkout.\n"
+            "The Stripe webhook returns 500 on every transaction.\n"
+            "Revenue impact: ~$12,000/minute.\n"
+            "All payment-related endpoints are affected."
+        ),
+        "comments"  : [
+            "CEO has been notified.",
+            "On-call engineer is investigating.",
+            "Rollback to v3.1.2 did not help.",
+        ],
+        "gold"      : {"label": "bug", "severity": "P0"},
     },
+
     {
-        "issue_id": "MED-002",
-        "title": "Broken link in footer of Home page",
-        "body": "The 'Privacy Policy' link in the footer leads to a 404 page.",
-        "comments": [],
-        "task_type": "severity",
-        "gold": {"label": "bug", "severity": "P2"},
-        "difficulty": "MEDIUM"
+        "issue_id"  : "MED-002",
+        "difficulty": "medium",
+        "task_type" : "severity",
+        "title"     : "Profile picture does not update immediately after upload",
+        "body"      : (
+            "After uploading a new profile picture, the old image\n"
+            "is still displayed in the navbar for ~30 seconds.\n"
+            "Refreshing the page shows the correct image.\n"
+            "This seems to be a cache invalidation delay."
+        ),
+        "comments"  : [
+            "Reproducible on all browsers.",
+            "Does not affect functionality.",
+        ],
+        "gold"      : {"label": "bug", "severity": "P3"},
     },
+
     {
-        "issue_id": "MED-003",
-        "title": "Missing examples in API documentation for /search endpoint",
-        "body": "The search endpoint documentation doesn't show the expected response format.",
-        "comments": [],
-        "task_type": "severity",
-        "gold": {"label": "documentation", "severity": "P3"},
-        "difficulty": "MEDIUM"
+        "issue_id"  : "MED-003",
+        "difficulty": "medium",
+        "task_type" : "severity",
+        "title"     : "Export to CSV silently drops rows with special characters",
+        "body"      : (
+            "When exporting data that contains Unicode characters (e.g., é, ñ, 中),\n"
+            "those rows are missing from the downloaded CSV.\n"
+            "No error is shown to the user.\n"
+            "Affects ~15% of our enterprise customer data."
+        ),
+        "comments"  : [
+            "Confirmed by 3 enterprise customers.",
+            "Workaround: manually sanitize data before export.",
+        ],
+        "gold"      : {"label": "bug", "severity": "P1"},
     },
+
+    # ══════════════════════════════════════════════════════════════════
+    # HARD — Label + Severity + Module
+    # ══════════════════════════════════════════════════════════════════
+
     {
-        "issue_id": "HARD-001",
-        "title": "JWT tokens are not invalidated after logout",
-        "body": "Security audit found that old JWT tokens can still be used for 15 minutes after the user logs out.",
-        "comments": ["This is high priority.", "Needs a blocklist in Redis."],
-        "task_type": "locate",
-        "gold": {"label": "bug", "severity": "P0", "module": "auth/logout.py"},
-        "difficulty": "HARD",
-        "context": {"repo_structure": ["auth/login.py", "auth/logout.py", "auth/utils.py", "main.py"]}
+        "issue_id"  : "HARD-001",
+        "difficulty": "hard",
+        "task_type" : "locate",
+        "title"     : "JWT tokens are not invalidated after user logout",
+        "body"      : (
+            "After logging out, the old JWT token can still be used\n"
+            "to make authenticated API requests.\n"
+            "Tokens remain valid until their 24-hour expiry.\n"
+            "This is a security vulnerability — stolen tokens cannot be revoked."
+        ),
+        "comments"  : [
+            "Pen test team flagged this as high severity.",
+            "No token blacklist or session store is implemented.",
+        ],
+        "context"   : {
+            "repo_structure": [
+                "auth/login.py",
+                "auth/logout.py",
+                "auth/token_validator.py",
+                "auth/middleware.py",
+                "users/profile.py",
+                "users/settings.py",
+                "api/routes.py",
+                "api/middleware.py",
+                "db/models.py",
+                "db/session.py",
+            ],
+            "description": (
+                "auth/ handles all authentication logic. "
+                "api/middleware.py validates tokens on each request. "
+                "db/session.py manages database sessions."
+            ),
+        },
+        "gold"      : {
+            "label"   : "bug",
+            "severity": "P0",
+            "modules" : ["auth/logout.py", "auth/token_validator.py"],
+        },
     },
+
     {
-        "issue_id": "HARD-002",
-        "title": "Memory leak in image processing worker",
-        "body": "Worker nodes are running out of RAM after processing several high-res images.",
-        "comments": ["Probably the 'Pillow' handles aren't being closed properly."],
-        "task_type": "locate",
-        "gold": {"label": "bug", "severity": "P1", "module": "workers/image_proc.py"},
-        "difficulty": "HARD",
-        "context": {"repo_structure": ["workers/image_proc.py", "workers/base.py", "utils/image.py"]}
+        "issue_id"  : "HARD-002",
+        "difficulty": "hard",
+        "task_type" : "locate",
+        "title"     : "Date picker ignores user's local timezone — shows UTC",
+        "body"      : (
+            "When scheduling a report, the date picker displays times in UTC\n"
+            "regardless of the user's browser timezone setting.\n"
+            "Users in GMT+5:30 are seeing events 5.5 hours off.\n"
+            "Scheduled reports are then sent at the wrong time."
+        ),
+        "comments"  : [
+            "Only affects the scheduling modal, not the dashboard calendar.",
+            "Introduced in PR #441 three weeks ago.",
+        ],
+        "context"   : {
+            "repo_structure": [
+                "components/DatePicker.jsx",
+                "components/Calendar.jsx",
+                "components/ScheduleModal.jsx",
+                "components/ReportForm.jsx",
+                "utils/dateUtils.js",
+                "utils/formatters.js",
+                "api/scheduler.py",
+                "api/reports.py",
+            ],
+            "description": (
+                "components/ holds React UI. utils/dateUtils.js centralises "
+                "all date/time conversion helpers. api/scheduler.py handles "
+                "backend report scheduling."
+            ),
+        },
+        "gold"      : {
+            "label"   : "bug",
+            "severity": "P1",
+            "modules" : ["components/ScheduleModal.jsx", "utils/dateUtils.js"],
+        },
     },
+
     {
-        "issue_id": "HARD-003",
-        "title": "SQL injection vulnerability in user search filter",
-        "body": "Found a potential SQL injection when searching users by name and using special characters.",
-        "comments": ["We need to use parameterized queries."],
-        "task_type": "locate",
-        "gold": {"label": "bug", "severity": "P0", "module": "db/queries.py"},
-        "difficulty": "HARD",
-        "context": {"repo_structure": ["db/schema.sql", "db/queries.py", "api/users.py"]}
-    }
+        "issue_id"  : "HARD-003",
+        "difficulty": "hard",
+        "task_type" : "locate",
+        "title"     : "Search returns duplicate results when pagination is used",
+        "body"      : (
+            "When browsing search results across multiple pages,\n"
+            "the same items appear on page 1 and page 2.\n"
+            "This happens when new records are inserted between page loads.\n"
+            "The issue is consistent with a missing stable sort/cursor."
+        ),
+        "comments"  : [
+            "Reproducible with any search query that returns > 20 results.",
+            "Elasticsearch version: 8.9.0.",
+        ],
+        "context"   : {
+            "repo_structure": [
+                "search/engine.py",
+                "search/indexer.py",
+                "search/pagination.py",
+                "search/filters.py",
+                "api/search_routes.py",
+                "api/middleware.py",
+                "db/models.py",
+                "db/query_builder.py",
+            ],
+            "description": (
+                "search/ contains all search logic. search/pagination.py handles "
+                "page offsets and cursors. search/engine.py sends queries to Elasticsearch."
+            ),
+        },
+        "gold"      : {
+            "label"   : "bug",
+            "severity": "P2",
+            "modules" : ["search/pagination.py", "search/engine.py"],
+        },
+    },
 ]

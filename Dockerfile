@@ -1,21 +1,14 @@
-# Use an official Python runtime as a parent image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container
+# Install dependencies
 COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
+# Copy source
 COPY . .
 
-# Run inference.py when the container launches
+# Default: run all tasks with gpt-4o-mini
+# Override with: docker run ... python inference.py --task 0 --model gpt-4o
 CMD ["python", "inference.py"]
