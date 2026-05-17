@@ -1,11 +1,3 @@
-"""
-app.py
-======
-FastAPI server exposing the BugTriageEnvironment as HTTP endpoints.
-Required by OpenEnv validator which sends POST requests to /reset, /step, /state.
-inference.py still runs as a background task on startup.
-"""
-
 import os
 import threading
 import uvicorn
@@ -19,7 +11,7 @@ app = FastAPI(title="Bug Triage Environment", version="1.0.0")
 env = BugTriageEnvironment()
 
 
-# ── Request models ─────────────────────────────────────────────────────
+# Request models 
 
 class ResetRequest(BaseModel):
     task_index: Optional[int] = 0
@@ -30,7 +22,7 @@ class StepRequest(BaseModel):
     module:   Optional[str] = None
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────
+# Endpoints 
 
 @app.get("/")
 def root():
@@ -76,7 +68,7 @@ def tasks():
     return {"tasks": env.list_tasks()}
 
 
-# ── Run inference.py in background on startup ──────────────────────────
+#  Run inference.py in background on startup 
 
 def run_inference():
     import subprocess
@@ -88,7 +80,7 @@ def startup_event():
     thread.start()
 
 
-# ── Main entry point ───────────────────────────────────────────────────
+#  Main entry point 
 
 def main():
     uvicorn.run("app:app", host="0.0.0.0", port=7860)
