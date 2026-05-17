@@ -1,10 +1,3 @@
-"""
-Bug Triage Environment
-======================
-Full OpenEnv-compliant environment with Pydantic typed models.
-Scores are strictly within (0.0, 1.0) exclusive as required by OpenEnv spec.
-"""
-
 import copy
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -18,7 +11,7 @@ def clamp(value: float) -> float:
     return max(SCORE_MIN, min(SCORE_MAX, round(value, 4)))
 
 
-# ── Pydantic Models ────────────────────────────────────────────────────
+# Pydantic Models 
 
 class BugTriageObservation(BaseModel):
     issue_id:  str
@@ -43,7 +36,7 @@ class BugTriageReward(BaseModel):
     done:     bool = False
 
 
-# ── Environment ────────────────────────────────────────────────────────
+# Environment 
 
 class BugTriageEnvironment:
     """
@@ -65,9 +58,6 @@ class BugTriageEnvironment:
         self._done          = False
         self._steps         = 0
 
-    # ------------------------------------------------------------------
-    # Core OpenEnv API
-    # ------------------------------------------------------------------
 
     def reset(self, task_index: int = 0) -> BugTriageObservation:
         self._current_index = task_index
@@ -119,9 +109,8 @@ class BugTriageEnvironment:
     def state(self) -> BugTriageObservation:
         return BugTriageObservation(**self._state)
 
-    # ------------------------------------------------------------------
+  
     # Sanitizer
-    # ------------------------------------------------------------------
 
     def _sanitize_action(self, action) -> dict:
         if isinstance(action, BugTriageAction):
@@ -142,9 +131,7 @@ class BugTriageEnvironment:
                 clean[k] = str(v)
         return clean
 
-    # ------------------------------------------------------------------
-    # Graders — all raw scores mapped through clamp()
-    # ------------------------------------------------------------------
+    # Graders 
 
     def _evaluate(self, action: dict):
         task      = self._current_task
@@ -229,9 +216,7 @@ class BugTriageEnvironment:
 
         return 0.05, "Unknown task type.", True
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+    
 
     def list_tasks(self):
         return [
