@@ -1,25 +1,10 @@
-"""
-inference.py
-============
-OpenEnv-compliant inference script for Bug Triage Environment.
-
-Required environment variables:
-    API_BASE_URL   The API endpoint for the LLM
-    MODEL_NAME     The model identifier to use
-    HF_TOKEN       Your Hugging Face / API key
-
-Usage:
-    python inference.py
-    python inference.py --task 0
-"""
-
 import os
 import json
 import argparse
 from openai import OpenAI
 from environment import BugTriageEnvironment, BugTriageAction
 
-# ── Config from environment variables ─────────────────────────────────
+# Config from environment variables
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
 API_KEY      = os.getenv("HF_TOKEN")     or os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -30,7 +15,7 @@ client = OpenAI(
     base_url=API_BASE_URL,
 )
 
-# ── System prompt ──────────────────────────────────────────────────────
+# System prompt 
 SYSTEM_PROMPT = """You are an expert software engineering triage agent.
 You will be shown a GitHub-style issue and must respond with a JSON object.
 
