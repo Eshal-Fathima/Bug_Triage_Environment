@@ -5,10 +5,7 @@ Task definitions for the Bug Triage Environment.
 
 TASKS = [
 
-    # ══════════════════════════════════════════════════════════════════
-    # EASY — Label classification (5 tasks)
-    # ══════════════════════════════════════════════════════════════════
-
+    # EASY 
     {
         "issue_id"  : "EASY-001",
         "difficulty": "easy",
@@ -97,10 +94,7 @@ TASKS = [
         "gold"      : {"label": "duplicate"},
     },
 
-    # ══════════════════════════════════════════════════════════════════
-    # MEDIUM — Label + Severity (5 tasks)
-    # ══════════════════════════════════════════════════════════════════
-
+    # MEDIUM 
     {
         "issue_id"  : "MED-001",
         "difficulty": "medium",
@@ -193,10 +187,7 @@ TASKS = [
         "gold"      : {"label": "bug", "severity": "P0"},
     },
 
-    # ══════════════════════════════════════════════════════════════════
-    # HARD — Label + Severity + Module (5 tasks)
-    # ══════════════════════════════════════════════════════════════════
-
+    # HARD 
     {
         "issue_id"  : "HARD-001",
         "difficulty": "hard",
